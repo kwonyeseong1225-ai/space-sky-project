@@ -1,0 +1,655 @@
+﻿<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A-Frame Space Planets</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="shoe_model.js"></script>
+    <script src="textures.js"></script>
+    <script>
+      AFRAME.registerComponent("planet-texture", {
+        schema: { type: "string" },
+        init: function () {
+          var el = this.el;
+          var file = this.data;
+          // textures.js의 Base64 데이터가 있으면 파일 더블클릭(file:///) 환경에서도 CORS 차단 없이 즉시 로드됩니다.
+          var textureSrc =
+            (window.PLANET_TEXTURES && window.PLANET_TEXTURES[file]) || file;
+          el.setAttribute("src", textureSrc);
+        },
+      });
+
+      // 초정밀 리얼 3D 제트 여객기 컴포넌트
+      AFRAME.registerComponent("realistic-airplane", {
+        init: function () {
+          var plane = new THREE.Group();
+
+          // 정밀 항공기 재질 (메탈릭 광택 & 틴티드 글래스)
+          var fuselageMat = new THREE.MeshStandardMaterial({
+            color: 0xf8fafc,
+            roughness: 0.2,
+            metalness: 0.15
+          });
+          var wingMat = new THREE.MeshStandardMaterial({
+            color: 0xf1f5f9,
+            roughness: 0.25,
+            metalness: 0.1
+          });
+          var glassMat = new THREE.MeshStandardMaterial({
+            color: 0x0f172a,
+            roughness: 0.1,
+            metalness: 0.85
+          });
+          var cowlMat = new THREE.MeshStandardMaterial({
+            color: 0xe2e8f0,
+            roughness: 0.3,
+            metalness: 0.3
+          });
+          var turbineMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            roughness: 0.5,
+            metalness: 0.7
+          });
+          var blueLivery = new THREE.MeshStandardMaterial({
+            color: 0x0284c7,
+            roughness: 0.3,
+            metalness: 0.1
+          });
+          var navRed = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+          var navGreen = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+
+          // 1. 유선형 메인 동체 (Fuselage)
+          // 진행 방향 = -Z 축 (노즈가 -Z 방향)
+          var bodyCyl = new THREE.CylinderGeometry(0.38, 0.35, 3.4, 24);
+          bodyCyl.rotateX(Math.PI / 2);
+          var body = new THREE.Mesh(bodyCyl, fuselageMat);
+          body.position.set(0, 0, 0);
+          plane.add(body);
+
+          // 노즈콘 (Nose Cone - 앞쪽 유선형 돔)
+          var noseGeom = new THREE.SphereGeometry(0.38, 24, 16);
+          noseGeom.scale(1, 0.92, 1.8);
+          var nose = new THREE.Mesh(noseGeom, fuselageMat);
+          nose.position.set(0, -0.02, -1.7);
+          plane.add(nose);
+
+          // 테일콘 (Tail Cone - 뒤쪽으로 갈수록 얇아지는 콘)
+          var tailConeGeom = new THREE.ConeGeometry(0.35, 2.2, 24);
+          tailConeGeom.rotateX(Math.PI / 2);
+          var tailCone = new THREE.Mesh(tailConeGeom, fuselageMat);
+          tailCone.position.set(0, 0.06, 2.8);
+          plane.add(tailCone);
+
+          // 조종석 윈드실드 (곡면 다크 틴티드 글래스)
+          var cockpitGeom = new THREE.BoxGeometry(0.52, 0.22, 0.75);
+          var cockpit = new THREE.Mesh(cockpitGeom, glassMat);
+          cockpit.position.set(0, 0.22, -1.55);
+          cockpit.rotation.x = 0.38;
+          plane.add(cockpit);
+
+          // 측면 승객 창문 라인 (좌우 스트라이프)
+          var winGeom = new THREE.BoxGeometry(0.78, 0.08, 2.6);
+          var cabinWindows = new THREE.Mesh(winGeom, glassMat);
+          cabinWindows.position.set(0, 0.12, 0.1);
+          plane.add(cabinWindows);
+
+          // 항공사 리버리 스트라이프 (스카이블루 라인)
+          var stripeGeom = new THREE.BoxGeometry(0.77, 0.05, 3.2);
+          var stripe = new THREE.Mesh(stripeGeom, blueLivery);
+          stripe.position.set(0, 0.02, 0.0);
+          plane.add(stripe);
+
+          // 2. 에어로다이나믹 후퇴익 주날개 (Swept-back Wings with Dihedral)
+          var wingShape = new THREE.Shape();
+          wingShape.moveTo(0, 0.5);
+          wingShape.lineTo(3.2, 1.4);
+          wingShape.lineTo(3.1, 1.9);
+          wingShape.lineTo(0, -0.6);
+          wingShape.closePath();
+
+          var extrudeOpt = {
+            depth: 0.06,
+            bevelEnabled: true,
+            bevelSegments: 2,
+            bevelSize: 0.02,
+            bevelThickness: 0.02
+          };
+          var wingLGeom = new THREE.ExtrudeGeometry(wingShape, extrudeOpt);
+          wingLGeom.rotateX(Math.PI / 2);
+
+          // 좌측 날개 (약간 위로 들린 상반각)
+          var wingL = new THREE.Mesh(wingLGeom, wingMat);
+          wingL.position.set(0.2, -0.05, -0.2);
+          wingL.rotation.z = -0.06;
+          plane.add(wingL);
+
+          // 우측 날개
+          var wingR = new THREE.Mesh(wingLGeom.clone(), wingMat);
+          wingR.scale.set(-1, 1, 1);
+          wingR.position.set(-0.2, -0.05, -0.2);
+          wingR.rotation.z = 0.06;
+          plane.add(wingR);
+
+          // 날개 끝 윙렛 (Sharklet Winglets)
+          var wingletGeom = new THREE.BoxGeometry(0.04, 0.5, 0.4);
+          var wingletL = new THREE.Mesh(wingletGeom, blueLivery);
+          wingletL.position.set(3.25, 0.24, 1.6);
+          wingletL.rotation.z = -0.25;
+          wingletL.rotation.y = -0.15;
+          plane.add(wingletL);
+
+          var wingletR = new THREE.Mesh(wingletGeom, blueLivery);
+          wingletR.position.set(-3.25, 0.24, 1.6);
+          wingletR.rotation.z = 0.25;
+          wingletR.rotation.y = 0.15;
+          plane.add(wingletR);
+
+          // 항행등 (좌적우록 Navigation Lights)
+          var navL = new THREE.Mesh(
+            new THREE.SphereGeometry(0.05, 8, 8),
+            navRed
+          );
+          navL.position.set(3.3, 0.48, 1.6);
+          plane.add(navL);
+
+          var navR = new THREE.Mesh(
+            new THREE.SphereGeometry(0.05, 8, 8),
+            navGreen
+          );
+          navR.position.set(-3.3, 0.48, 1.6);
+          plane.add(navR);
+
+          // 3. 제트 터보팬 엔진 2기 (파일런 + 카울링 + 전면 팬 + 후면 배기구)
+          [-1.35, 1.35].forEach(function (posX) {
+            var eng = new THREE.Group();
+
+            // 파일런 (Pylon)
+            var pylon = new THREE.Mesh(
+              new THREE.BoxGeometry(0.06, 0.25, 0.7),
+              wingMat
+            );
+            pylon.position.set(0, 0.2, 0);
+            eng.add(pylon);
+
+            // 외부 카울링
+            var cowlGeom = new THREE.CylinderGeometry(0.27, 0.24, 1.3, 20);
+            cowlGeom.rotateX(Math.PI / 2);
+            var cowl = new THREE.Mesh(cowlGeom, cowlMat);
+            eng.add(cowl);
+
+            // 전면 흡입구 팬 스피너
+            var fanGeom = new THREE.ConeGeometry(0.1, 0.35, 16);
+            fanGeom.rotateX(Math.PI / 2);
+            var fan = new THREE.Mesh(fanGeom, turbineMat);
+            fan.position.set(0, 0, -0.65);
+            eng.add(fan);
+
+            // 후면 배기 노즐
+            var nozzleGeom = new THREE.CylinderGeometry(0.19, 0.16, 0.35, 16);
+            nozzleGeom.rotateX(Math.PI / 2);
+            var nozzle = new THREE.Mesh(nozzleGeom, turbineMat);
+            nozzle.position.set(0, 0, 0.75);
+            eng.add(nozzle);
+
+            eng.position.set(posX, -0.35, 0.3);
+            plane.add(eng);
+          });
+
+          // 4. 수직 꼬리날개 (Vertical Stabilizer)
+          var finShape = new THREE.Shape();
+          finShape.moveTo(0, 0);
+          finShape.lineTo(0, -1.0);
+          finShape.lineTo(0.35, -1.5);
+          finShape.lineTo(1.6, 0);
+          finShape.closePath();
+
+          var finGeom = new THREE.ExtrudeGeometry(finShape, {
+            depth: 0.06,
+            bevelEnabled: true,
+            bevelSize: 0.015,
+            bevelThickness: 0.015
+          });
+          finGeom.rotateY(-Math.PI / 2);
+          var fin = new THREE.Mesh(finGeom, blueLivery);
+          fin.position.set(0, 0.35, 2.5);
+          plane.add(fin);
+
+          // 5. 수평 꼬리날개 (Horizontal Stabilizers)
+          var hTailShape = new THREE.Shape();
+          hTailShape.moveTo(0, 0.2);
+          hTailShape.lineTo(1.2, 0.6);
+          hTailShape.lineTo(1.1, 0.85);
+          hTailShape.lineTo(0, -0.3);
+          hTailShape.closePath();
+
+          var hTailGeom = new THREE.ExtrudeGeometry(hTailShape, extrudeOpt);
+          hTailGeom.rotateX(Math.PI / 2);
+
+          var hTailL = new THREE.Mesh(hTailGeom, wingMat);
+          hTailL.position.set(0.1, 0.25, 2.6);
+          plane.add(hTailL);
+
+          var hTailR = new THREE.Mesh(hTailGeom.clone(), wingMat);
+          hTailR.scale.set(-1, 1, 1);
+          hTailR.position.set(-0.1, 0.25, 2.6);
+          plane.add(hTailR);
+
+          // 전체 뱅크각(선회시 날개 기울임) 세팅
+          plane.rotation.z = -0.22; // 궤도 회전 중심 방향으로 자연스러운 롤
+
+          this.el.setObject3D("mesh", plane);
+        }
+      });
+
+      // 360도 청명한 주간 하늘 그라데이션 돔
+      AFRAME.registerComponent("sky-gradient", {
+        init: function () {
+          var canvas = document.createElement("canvas");
+          canvas.width = 512;
+          canvas.height = 512;
+          var ctx = canvas.getContext("2d");
+
+          var grad = ctx.createLinearGradient(0, 0, 0, 512);
+          grad.addColorStop(0.0, "#0284c7"); // 높은 하늘 (깊은 스카이 블루)
+          grad.addColorStop(0.4, "#38bdf8"); // 청명한 맑은 하늘
+          grad.addColorStop(0.65, "#bae6fd"); // 지평선 밝은 하늘빛
+          grad.addColorStop(0.85, "#f0f9ff"); // 눈부신 대기광
+          grad.addColorStop(1.0, "#7dd3fc"); // 하단 부드러운 반사
+
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 512, 512);
+
+          var texture = new THREE.CanvasTexture(canvas);
+          var material = new THREE.MeshBasicMaterial({
+            map: texture,
+            side: THREE.BackSide
+          });
+          var geometry = new THREE.SphereGeometry(90, 32, 32);
+          var mesh = new THREE.Mesh(geometry, material);
+          this.el.setObject3D("sky-mesh", mesh);
+        }
+      });
+
+      // 극사실적 소프트 볼류메트릭 뭉게구름 컴포넌트
+      AFRAME.registerComponent("sky-clouds", {
+        init: function () {
+          var group = new THREE.Group();
+
+          // 1. 프로시저럴 소프트 구름 텍스처 생성 (부드러운 수증기 퍼프)
+          var canvas = document.createElement("canvas");
+          canvas.width = 256;
+          canvas.height = 256;
+          var ctx = canvas.getContext("2d");
+
+          var grad = ctx.createRadialGradient(128, 128, 10, 128, 128, 120);
+          grad.addColorStop(0.0, "rgba(255, 255, 255, 0.95)");
+          grad.addColorStop(0.25, "rgba(255, 255, 255, 0.85)");
+          grad.addColorStop(0.55, "rgba(245, 248, 255, 0.45)");
+          grad.addColorStop(0.8, "rgba(235, 242, 255, 0.15)");
+          grad.addColorStop(1.0, "rgba(255, 255, 255, 0.0)");
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 256, 256);
+
+          for (var n = 0; n < 14; n++) {
+            var ox = 128 + (Math.random() - 0.5) * 75;
+            var oy = 128 + (Math.random() - 0.5) * 65;
+            var r = 35 + Math.random() * 45;
+            var g = ctx.createRadialGradient(ox, oy, 5, ox, oy, r);
+            g.addColorStop(0.0, "rgba(255, 255, 255, 0.5)");
+            g.addColorStop(0.6, "rgba(250, 252, 255, 0.2)");
+            g.addColorStop(1.0, "rgba(255, 255, 255, 0.0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(ox, oy, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          var cloudTexture = new THREE.CanvasTexture(canvas);
+
+          // 2. 사실적인 거대 뭉게구름 군락 생성
+          var clusterCount = 18;
+          this.cloudList = [];
+          var planeGeom = new THREE.PlaneGeometry(1, 1);
+
+          for (var c = 0; c < clusterCount; c++) {
+            var cloudGroup = new THREE.Group();
+            var puffCount = 14 + Math.floor(Math.random() * 8);
+
+            var dist = 18 + Math.random() * 32;
+            var angle =
+              (c / clusterCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+            var y = 2 + Math.random() * 18;
+            var cx = dist * Math.cos(angle);
+            var cz = dist * Math.sin(angle);
+
+            cloudGroup.position.set(cx, y, cz);
+
+            for (var p = 0; p < puffCount; p++) {
+              var px = (Math.random() - 0.5) * 8.5;
+              var py = (Math.random() - 0.5) * 3.0;
+              var pz = (Math.random() - 0.5) * 8.5;
+
+              // 상단 햇빛 화이트 & 하단 대기 산란 소프트 섀도우
+              var heightFactor = (py + 1.5) / 3.0;
+              var puffColor = new THREE.Color().lerpColors(
+                new THREE.Color("#c7d2fe"),
+                new THREE.Color("#ffffff"),
+                Math.max(0, Math.min(1, heightFactor + 0.2))
+              );
+
+              var mat = new THREE.MeshBasicMaterial({
+                map: cloudTexture,
+                transparent: true,
+                opacity: 0.62 + Math.random() * 0.28,
+                color: puffColor,
+                depthWrite: false,
+                side: THREE.DoubleSide
+              });
+
+              var mesh = new THREE.Mesh(planeGeom, mat);
+              mesh.position.set(px, py, pz);
+
+              var scaleW = 5.0 + Math.random() * 5.5;
+              var scaleH = 4.0 + Math.random() * 4.0;
+              mesh.scale.set(scaleW, scaleH, 1);
+              mesh.rotation.z = Math.random() * Math.PI * 2;
+
+              cloudGroup.add(mesh);
+            }
+
+            var driftSpeed =
+              (0.0004 + Math.random() * 0.0008) *
+              (Math.random() > 0.5 ? 1 : -1);
+
+            group.add(cloudGroup);
+            this.cloudList.push({
+              group: cloudGroup,
+              dist: dist,
+              angle: angle,
+              speed: driftSpeed,
+              puffs: cloudGroup.children
+            });
+          }
+
+          // 3. 지평선 원경 안개/구름층 (Horizon Mist Layer)
+          var horizonCount = 14;
+          for (var h = 0; h < horizonCount; h++) {
+            var hAngle = (h / horizonCount) * Math.PI * 2;
+            var hDist = 58 + Math.random() * 15;
+            var hMesh = new THREE.Mesh(
+              planeGeom,
+              new THREE.MeshBasicMaterial({
+                map: cloudTexture,
+                transparent: true,
+                opacity: 0.42,
+                color: new THREE.Color("#e0f2fe"),
+                depthWrite: false,
+                side: THREE.DoubleSide
+              })
+            );
+            hMesh.position.set(
+              hDist * Math.cos(hAngle),
+              -2 + Math.random() * 5,
+              hDist * Math.sin(hAngle)
+            );
+            hMesh.scale.set(32 + Math.random() * 22, 11 + Math.random() * 8, 1);
+            hMesh.lookAt(0, 0, 0);
+            group.add(hMesh);
+          }
+
+          this.el.object3D.add(group);
+        },
+        tick: function (time, delta) {
+          if (!this.cloudList) return;
+          var d = Math.min(delta / 16.6, 2.0);
+          var cam = this.el.sceneEl.camera;
+
+          for (var i = 0; i < this.cloudList.length; i++) {
+            var item = this.cloudList[i];
+            item.angle += item.speed * d * 0.2;
+            item.group.position.x = item.dist * Math.cos(item.angle);
+            item.group.position.z = item.dist * Math.sin(item.angle);
+
+            // 항상 카메라를 바라보는 빌보드 처리 (어디서 봐도 진짜 솜털 뭉게구름)
+            if (cam) {
+              for (var j = 0; j < item.puffs.length; j++) {
+                item.puffs[j].quaternion.copy(cam.quaternion);
+              }
+            }
+          }
+        }
+      });
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #38bdf8;
+      }
+    </style>
+  </head>
+  <body>
+    <a-scene background="color: #38bdf8">
+      <!-- 360도 푸른 하늘 돔 -->
+      <a-entity sky-gradient></a-entity>
+
+      <!-- 하늘에 떠다니는 3D 뭉게구름들 -->
+      <a-entity sky-clouds></a-entity>
+
+      <!-- 화사한 주간 자연광 & 태양광 조명 -->
+      <a-entity light="type: ambient; color: #e0f2fe; intensity: 1.5"></a-entity>
+      <a-entity
+        light="type: directional; color: #fffbeb; intensity: 1.8"
+        position="6 12 8"
+      ></a-entity>
+      <a-entity
+        light="type: directional; color: #bae6fd; intensity: 0.8"
+        position="-5 -4 -4"
+      ></a-entity>
+
+      <a-entity id="camera-rig" position="0 1.6 0">
+        <a-camera position="0 0 0"></a-camera>
+
+        <!-- === [공들과 함께 공전하는 리얼 3D 제트 여객기] === -->
+        <a-entity
+          rotation="10 0 -6"
+          animation="property: rotation; to: 10 360 -6; loop: true; dur: 6500; easing: linear;"
+        >
+          <a-entity
+            realistic-airplane
+            position="5.0 0.3 0"
+            scale="0.45 0.45 0.45"
+            animation__bob="property: position; to: 5.0 -0.4 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
+          ></a-entity>
+        </a-entity>
+
+        <!-- === [세트 1] === -->
+        <!-- 구 1: 2.jpg -->
+        <a-entity
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 4500; easing: linear;"
+        >
+          <a-sphere
+            position="2.6 0.2 0"
+            radius="0.6"
+            planet-texture="2.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 2200; easing: linear;"
+            animation__bob="property: position; to: 2.6 1.1 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 2: 3.png -->
+        <a-entity
+          rotation="14 0 0"
+          animation="property: rotation; to: 14 360 0; loop: true; dur: 7000; easing: linear;"
+        >
+          <a-sphere
+            position="4.3 -0.1 0"
+            radius="0.72"
+            planet-texture="3.png"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear;"
+            animation__bob="property: position; to: 4.3 0.9 0; dir: alternate; loop: true; dur: 2100; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 3: 1.jpg -->
+        <a-entity
+          rotation="-10 0 0"
+          animation="property: rotation; to: -10 360 0; loop: true; dur: 10200; easing: linear;"
+        >
+          <a-sphere
+            position="6.0 0.35 0"
+            radius="0.5"
+            planet-texture="1.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3800; easing: linear;"
+            animation__bob="property: position; to: 6.0 -0.65 0; dir: alternate; loop: true; dur: 2500; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- === [세트 2] (기울어진 다른 궤도) === -->
+        <!-- 구 4: 2.jpg -->
+        <a-entity
+          rotation="35 0 20"
+          animation="property: rotation; to: 35 360 20; loop: true; dur: 5400; easing: linear;"
+        >
+          <a-sphere
+            position="-3.3 0.4 0"
+            radius="0.55"
+            planet-texture="2.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 2500; easing: linear;"
+            animation__bob="property: position; to: -3.3 -0.5 0; dir: alternate; loop: true; dur: 1800; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 5: 3.png -->
+        <a-entity
+          rotation="-25 40 10"
+          animation="property: rotation; to: -25 400 10; loop: true; dur: 8400; easing: linear;"
+        >
+          <a-sphere
+            position="-5.1 -0.2 0"
+            radius="0.68"
+            planet-texture="3.png"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3200; easing: linear;"
+            animation__bob="property: position; to: -5.1 0.8 0; dir: alternate; loop: true; dur: 2300; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 6: 1.jpg -->
+        <a-entity
+          rotation="50 -30 -15"
+          animation="property: rotation; to: 50 330 -15; loop: true; dur: 11600; easing: linear;"
+        >
+          <a-sphere
+            position="-6.8 0.5 0"
+            radius="0.48"
+            planet-texture="1.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear;"
+            animation__bob="property: position; to: -6.8 -0.4 0; dir: alternate; loop: true; dur: 2700; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- === [세트 3] (사선 및 깊은 궤도) === -->
+        <!-- 구 7: 2.jpg -->
+        <a-entity
+          rotation="-45 60 -10"
+          animation="property: rotation; to: -45 420 -10; loop: true; dur: 6200; easing: linear;"
+        >
+          <a-sphere
+            position="3.5 -0.5 0"
+            radius="0.52"
+            planet-texture="2.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 2400; easing: linear;"
+            animation__bob="property: position; to: 3.5 0.5 0; dir: alternate; loop: true; dur: 1900; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 8: 3.png -->
+        <a-entity
+          rotation="65 120 25"
+          animation="property: rotation; to: 65 480 25; loop: true; dur: 9200; easing: linear;"
+        >
+          <a-sphere
+            position="5.7 0.6 0"
+            radius="0.65"
+            planet-texture="3.png"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3500; easing: linear;"
+            animation__bob="property: position; to: 5.7 -0.4 0; dir: alternate; loop: true; dur: 2400; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 9: 1.jpg -->
+        <a-entity
+          rotation="-15 -90 40"
+          animation="property: rotation; to: -15 270 40; loop: true; dur: 13000; easing: linear;"
+        >
+          <a-sphere
+            position="7.6 -0.3 0"
+            radius="0.46"
+            planet-texture="1.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 4200; easing: linear;"
+            animation__bob="property: position; to: 7.6 0.7 0; dir: alternate; loop: true; dur: 2900; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- === [세트 4] (극궤도 및 대각선 궤도) === -->
+        <!-- 구 10: 2.jpg -->
+        <a-entity
+          rotation="75 30 0"
+          animation="property: rotation; to: 75 390 0; loop: true; dur: 4800; easing: linear;"
+        >
+          <a-sphere
+            position="3.0 0.8 0"
+            radius="0.58"
+            planet-texture="2.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 2100; easing: linear;"
+            animation__bob="property: position; to: 3.0 -0.2 0; dir: alternate; loop: true; dur: 1700; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 11: 3.png -->
+        <a-entity
+          rotation="-60 -50 30"
+          animation="property: rotation; to: -60 310 30; loop: true; dur: 7600; easing: linear;"
+        >
+          <a-sphere
+            position="-4.6 -0.5 0"
+            radius="0.70"
+            planet-texture="3.png"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3100; easing: linear;"
+            animation__bob="property: position; to: -4.6 0.6 0; dir: alternate; loop: true; dur: 2200; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+
+        <!-- 구 12: 1.jpg -->
+        <a-entity
+          rotation="20 160 -45"
+          animation="property: rotation; to: 20 520 -45; loop: true; dur: 10800; easing: linear;"
+        >
+          <a-sphere
+            position="6.5 0.2 0"
+            radius="0.49"
+            planet-texture="1.jpg"
+            material="metalness: 0.15; roughness: 0.65;"
+            animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3900; easing: linear;"
+            animation__bob="property: position; to: 6.5 -0.7 0; dir: alternate; loop: true; dur: 2600; easing: easeInOutSine;"
+          ></a-sphere>
+        </a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
